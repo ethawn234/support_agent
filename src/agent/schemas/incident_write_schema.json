@@ -1,0 +1,29 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://example.com/incident.schema.json",
+    "description": "An incident record in the incident table",
+    "title": "incident",
+    "type": "object",
+    "properties": {
+        "caller_id": {
+            "type": "string",
+            "description": "The person's full name"
+        },
+        "contact_type": {
+            "type": "string",
+            "description": "The requestor's email address"
+        },
+        "short_description": {
+            "type": "string",
+            "description": "The brief issue description"
+        },
+        "description": {
+            "type": "string",
+            "description": "The full issue description"
+        },
+        "comments": {
+            "type": "string",
+            "description": "Agent's analysis and comments about the issue"
+        }
+    }
+}
