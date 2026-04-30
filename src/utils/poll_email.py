@@ -28,8 +28,6 @@ def search_email(toolkit: GmailToolkit):
             return None
             # return state
 
-        
-
         return results
     except Exception as e:
         print(f"Error while searching email: {e}")
@@ -37,13 +35,13 @@ def search_email(toolkit: GmailToolkit):
 
 async def poll_emails(toolkit: GmailToolkit):
     """Async polling loop — runs for the lifetime of the server."""
-    print(f"Email polling started (interval: {POLL_INTERVAL_SECONDS}s)")
+    print(f"Email polling started (interval: {POLL_INTERVAL_SECONDS}s)\n\n")
     while True:
         try:
             new_email = search_email(toolkit)
             if new_email:
-                print(f"\n\nNew IT Support Request Email: {new_email}\n\n")
-                print("New support email found — kicking off workflow...")
+                # print(f"\n\nNew IT Support Request Email: {new_email}\n\n")
+                print("New support email found — kicking off workflow...\n\n")
                 # TODO: trigger LangGraph workflow with new_state
                 workflow_run = asyncio.create_task(run_workflow(new_email), name="Run Workflow")
                 
