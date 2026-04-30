@@ -14,7 +14,7 @@ Priority = Literal[1, 2, 3, 4, 5] # "1 - Critical", "2 - High", "3 - Moderate", 
 # The extent to which an incident affects the business
 Impact = Literal[1, 2, 3]  # (1|2|3, High|Medium|Low)
 
-Breaker_State = Literal["OPEN", "CLOSED", "HALF-OPEN"]
+Breaker_State = Literal["OPEN", "CLOSED", "HALF-OPEN", "DEGRADED"]
 class EmailClassification(BaseModel):
     intent: str = Field(..., description="The intent of the email (e.g., password reset, software issue, hardware issue)")
     urgency: Urgency = Field(..., description="Urgency level of the issue")
