@@ -11,15 +11,14 @@ Category = Literal["network", "software", "hardware", "password_reset", "inquiry
 Urgency = Literal[1, 2, 3] # (1|2|3, High|Medium|Low)
 # Sequence in which an incident needs to be resolved 
 Priority = Literal[1, 2, 3, 4, 5] # "1 - Critical", "2 - High", "3 - Moderate", "4 - Low", "5 - Planning"
-# The extent to which an incident affects the business
-Impact = Literal[1, 2, 3]  # (1|2|3, High|Medium|Low)
 
 Breaker_State = Literal["OPEN", "CLOSED", "HALF-OPEN", "DEGRADED"]
 class EmailClassification(BaseModel):
     intent: str = Field(..., description="The intent of the email (e.g., password reset, software issue, hardware issue)")
     urgency: Urgency = Field(..., description="Urgency level of the issue")
     category: Category = Field(..., description="Category of the issue")
-    summary: str = Field(..., description="A brief summary of the issue described in the email")
+    analysis: str = Field(..., description="Agent's analysis and recommendation")
+    priority: Priority = Field(..., description="Severity of the issue")
 class ServiceNowIncident(BaseModel):
     short_description: str = Field(..., description="Short description of the incident")
     description: str = Field(..., description="Detailed description of the incident")
