@@ -1,0 +1,17 @@
+[
+  {
+    "issue": "My computer is not turning on. The power light is not illuminating.",
+    "priority": 1,
+    "solution_criteria": "Quickly diagnose and resolve the power issue. Solution must restore the user's ability to access their computer within 30 minutes."
+  },
+  {
+    "issue": "I am unable to access the company's internal file server. I need to retrieve an important document for a meeting in 2 hours.",
+    "priority": 3,
+    "solution_criteria": "Investigate and restore the user's access to the file server. Solution must be provided within 1 hour to ensure the user can retrieve the necessary document."
+  },
+  {
+    "issue": "My printer is not responding when I try to print a document. I have a deadline to submit this report by the end of the day.",
+    "priority": 2,
+    "solution_criteria": "Troubleshoot and resolve the printer issue. Solution must be provided within 2 hours to allow the user to print the document before the end of the day."
+  }
+]

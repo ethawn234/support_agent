@@ -1,0 +1,56 @@
+[
+  {
+    "ticket": "\n[\n    {\n        \"intent\": \"Hardware issue\",\n        \"urgency\": 3,\n        \"category\": \"hardware_issue\",\n        \"analysis\": \"The issue reported indicates a hardware problem with the computer, as the power light is not illuminating, suggesting a potential issue with the power supply or motherboard. This is a hardware-related issue that requires immediate attention to diagnose and resolve the problem.\",\n        \"priority\": 2\n    }\n]\n",
+    "score": 9.0,
+    "test_issue": "My computer is not turning on. The power light is not illuminating.",
+    "grade_by_model": {
+      "score": 8,
+      "reasoning": "The technician has demonstrated strong problem-solving skills by correctly identifying the hardware nature of the issue and the urgency required to resolve it. However, the response could be improved by outlining a concrete troubleshooting process to diagnose and address the power problem efficiently.",
+      "strengths": [
+        "Accurately identified the issue as a hardware problem requiring immediate attention",
+        "Provided a clear analysis of the potential causes, including the power supply or motherboard",
+        "Recognized the urgency of the situation and the need to resolve the problem within 30 minutes"
+      ],
+      "weaknesses": [
+        "Did not provide a specific troubleshooting plan or steps to diagnose and resolve the issue"
+      ]
+    },
+    "grade_by_syntax": 10
+  },
+  {
+    "ticket": "\n[\n    {\n        \"intent\": \"Software issue\",\n        \"urgency\": 2,\n        \"category\": \"software_issue\",\n        \"analysis\": \"The user is unable to access the company's internal file server, which is a software-related issue. The urgency is high as the user needs to retrieve an important document for a meeting in 2 hours. This should be treated as a high-priority incident that requires prompt resolution.\",\n        \"priority\": 2\n    }\n]\n",
+    "score": 9.0,
+    "test_issue": "I am unable to access the company's internal file server. I need to retrieve an important document for a meeting in 2 hours.",
+    "grade_by_model": {
+      "score": 8,
+      "reasoning": "The technician has demonstrated a strong understanding of the user's issue and the urgency of the situation. They have correctly identified the problem as a software-related issue and proposed a solution to restore the user's access to the file server in a timely manner. However, the solution lacks specific details on how the technician plans to investigate and resolve the problem, which would be necessary to ensure a successful and efficient resolution.",
+      "strengths": [
+        "Accurately identified the issue as a software-related problem with the file server",
+        "Recognized the high urgency of the situation due to the impending meeting",
+        "Proposed a solution that focuses on restoring the user's access to the file server within the required timeframe"
+      ],
+      "weaknesses": [
+        "Did not provide any specific steps or troubleshooting methods to investigate and restore access to the file server"
+      ]
+    },
+    "grade_by_syntax": 10
+  },
+  {
+    "ticket": "\n[\n  {\n    \"intent\": \"hardware_issue\",\n    \"urgency\": 2,\n    \"category\": \"hardware_issue\",\n    \"analysis\": \"The user is reporting a printer issue, which suggests a hardware problem. The user has a deadline to meet, so the urgency is high. The appropriate category for this issue is 'hardware_issue'.\",\n    \"priority\": 2\n  }\n]\n",
+    "score": 6.5,
+    "test_issue": "My printer is not responding when I try to print a document. I have a deadline to submit this report by the end of the day.",
+    "grade_by_model": {
+      "score": 3,
+      "reasoning": "The technician has accurately assessed the user's issue and the urgency of the situation. However, the solution provided does not include any concrete steps to troubleshoot and resolve the printer problem in a timely manner. To fully address the user's needs, the technician should suggest specific troubleshooting actions that can be taken to fix the printer and enable the user to print the document before the deadline.",
+      "strengths": [
+        "Accurately identified the issue as a hardware problem with the printer",
+        "Recognized the high urgency due to the user's deadline",
+        "Appropriately categorized the issue as a 'hardware_issue'"
+      ],
+      "weaknesses": [
+        "The proposed solution does not provide any specific troubleshooting steps to resolve the printer issue within the 2-hour timeframe"
+      ]
+    },
+    "grade_by_syntax": 10
+  }
+]
