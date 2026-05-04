@@ -49,7 +49,20 @@ def classification(state: AgentState):
         
         Request: {state.email_content}
 
-        Analyze this IT request and provide the classification, including intent, urgency, category, and summary.
+        Analyze this IT request and provide the classification, including intent, priority, category, and summary.
+
+        Example output:
+        ```json
+        [
+            {{
+                "intent": "The intent of the email (e.g., password reset, software issue, hardware issue)",
+                "urgency": "The extent to which resolution of an incident can bear delay (1 for high delay, 3 for low delay)",
+                "category": "Category of the issue: ["network", "software", "hardware", "password_reset", "inquiry", "database"]",
+                "analysis": "Agent's analysis and recommendation",
+                "priority": "An integer from 1 to 5 indicating the severity in which an incident needs to be resolved: 1 - Critical, 2 - High, 3 - Moderate, 4 - Low, 5 - Planning"
+            }}
+        ]
+        ```
         """)
         state.messages = [prompt]
         response = llm.with_structured_output(EmailClassification).invoke(prompt.content)
@@ -82,7 +95,14 @@ def validate_issue(state: AgentState):
 
 
 def output_guardrail(state):
-    """Guardrail to ensure agent only takes actions that are supported by the tools available."""
+    """Guardrail to ensure agent only takes actions that are supported by the tools available.
+    
+    Ensure:
+        1. intent: relates to IT support topics (sentiment analysis?)
+        2. priority: is low priority (eg 3)
+        3. priority: is >=4
+        4. impact: is ==3
+    """
     print(f"In output_guardrail checking state: {state}")
 
 def approval(state):
