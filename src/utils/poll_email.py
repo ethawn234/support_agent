@@ -43,7 +43,7 @@ async def poll_emails(toolkit: GmailToolkit):
                 # print(f"\n\nNew IT Support Request Email: {new_email}\n\n")
                 print("New support email found — kicking off workflow...\n\n")
                 # TODO: trigger LangGraph workflow with new_state
-                workflow_run = asyncio.create_task(run_workflow(new_email), name="Run Workflow")
+                workflow_run = asyncio.create_task(run_workflow(new_email, toolkit), name="Run Workflow")
                 
                 try:
                     await workflow_run

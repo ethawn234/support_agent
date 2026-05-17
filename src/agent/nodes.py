@@ -1,49 +1,45 @@
-import os
-from pprint import pprint
 import json
+from typing import Literal, Type
 
-from dotenv import load_dotenv
-from pydantic import SecretStr
-from langchain_openai import ChatOpenAI
 from langgraph.types import Command, interrupt
-from langchain.messages import SystemMessage, HumanMessage
+from langgraph.graph import END
+from langchain.messages import SystemMessage, HumanMessage, AIMessage
+from langchain_google_community.gmail.create_draft import GmailCreateDraft
+from langchain_google_community.gmail.send_message import GmailSendMessage
+
 
 from agent.state import AgentState, EmailClassification
+from agent.llm import llm
 
-load_dotenv()
+# entry
+def read_email(state: AgentState):
+    """Pre-processor for emails related to IT support. Basic validation (eg PII, Prompt Injection, IT support relevance (how to determine?)) can be added here as well."""
+    print(f"\n\nIn read_email()...")
 
-portkey_api_key = os.getenv("PORTKEY_API_KEY")
+    try:
+        if state.raw_email is not None:
+            request = state.raw_email[0]
 
-if portkey_api_key is None:
-    raise ValueError("PORTKEY_API_KEY environment variable is not set")
+            if "support" in request['subject'] or "Support" in request['subject']:
+                print(f"\n\nEmail is a valid IT Support request: {request}")
 
-llm = ChatOpenAI(
-    api_key=SecretStr(portkey_api_key),
-    base_url=os.getenv("PORTKEY_URL", None),
-    model="@azure-openai-eus2/gpt-5-mini",
-    default_headers={
-        "x-portkey-provider":"@azure-openai-eus2/gpt-5-mini"
-    }
-)
-
-def input_guardrail(state: AgentState):
-    """Guardrail to ensure agent only processes emails related to IT support."""
-    print(f"\n\nIn input_guardrail()...")
-    if state.raw_email is not None:
-        request = state.raw_email[0]
-        
-    if "support" in request['subject'] or "Support" in request['subject']:
-        print("\n\nEmail is a valid IT Support request. Continuing...")
-        return {"is_valid_req": True}
-    else:
-        print("\n\nInvalid email type. 'Support' not found in subject. Interrupting...")
-        interrupt("Email does not appear to be related to IT support. Ignoring.")
+        return state
+    except Exception as e:
+        print(f"\n\nInvalid email type. 'Support' not found in subject: {e}")
+        # have human determine if email
+        return "request_slack_or_email_clarification"
 
 
-def classification(state: AgentState):
-    """Classify incoming email and determine next step in workflow."""
-    print("\n\nIn classification()")
-    
+def classification(state: AgentState) -> Command[Literal["human_review", "request_slack_or_email_clarification", "create_ticket"]]:
+    """Classify incoming email and determine nature of the request, urgency, and category. This will help determine the appropriate next steps for resolution, such as whether human approval is needed, whether clarification is needed from the user, or whether a ticket can be automatically created and relevant teams notified.
+
+    1. If classified:
+        a. if low-priority, goto create_ticket
+        b. if high-priority (or risky -> impact), goto human_review
+    2. If more info required:
+        - goto request_slack_or_email_clarification
+    """
+    print("\n\nIn classification()") 
     try:
         prompt = SystemMessage(f"""Classify the following support request into one of the following categories: 1) password_issue, 2) hardware_issue, 3) software_issue 4) general_inquiry. 
         
@@ -59,63 +55,140 @@ def classification(state: AgentState):
                 "urgency": "The extent to which resolution of an incident can bear delay (1 for high delay, 3 for low delay)",
                 "category": "Category of the issue: ["network", "software", "hardware", "password_reset", "inquiry", "database"]",
                 "analysis": "Agent's analysis and recommendation",
-                "priority": "An integer from 1 to 5 indicating the severity in which an incident needs to be resolved: 1 - Critical, 2 - High, 3 - Moderate, 4 - Low, 5 - Planning"
+                "priority": "An integer from 1 to 5 indicating the severity in which an incident needs to be resolved: 1 - Critical, 2 - High, 3 - Moderate, 4 - Low, 5 - Planning",
+                "impact": "The effect of an issue on the business: 1 - High, 2 - Medium, 3 - Low",
+                "needs_info": "Boolean indicating if more information is required from the requestor"
             }}
         ]
         ```
         """)
-        state.messages = [prompt]
+        
+        # if high-priority, goto = human_review
+        
+        # if low-priority, goto = create_ticket
         response = llm.with_structured_output(EmailClassification).invoke(prompt.content)
-        if response:
-            pprint(f'\n\nLLM Classification response: {response}')
-            print('\n\nUser issue classified by LLM. Continuing...')
-            return {"classification": response}
+        impact = response["impact"]
+        needs_info = response["needs_info"]
+        
+        if needs_info:
+            goto = "request_slack_or_email_clarification"
         else:
-            return {"classification": None}
+            goto = "create_ticket"
+
+        return Command(
+            update={ "classification": response },
+            goto=goto
+        )
+    
     except Exception as e:
         # handle 429
         print(f'Could not get LLM classifiction: {e}')
-        # handle 500s
-
-        # update cb state
-
-def validate_issue(state: AgentState):
-    """Analyze the issue in the email and determine appropriate next steps for resolution."""
-    pprint('\n\nAnalyzing LLM output...')
-
-    try:        
-        if state.classification is not None:
-            if EmailClassification.model_validate_json(json.dumps(state.classification.__dict__)):
-                print('\n\nLLM output validated against classification schema...continuing.')
-                return state
-    except Exception as e:
-        print(f'\n\nInterrupting as LLM response JSON could not be validated: {e}')
-        interrupt(f"\n\nLLM response could not be validated: {json.dumps(state)}")
-        # TODO: rerun prompt through LLM if output does not follow EmailClassification schema
+        return Command(
+            update={ "classification": response },
+            goto="human_review"
+        )
 
 
-def output_guardrail(state):
-    """Guardrail to ensure agent only takes actions that are supported by the tools available.
-    
-    Ensure:
-        1. intent: relates to IT support topics (sentiment analysis?)
-        2. priority: is low priority (eg 3)
-        3. priority: is >=4
-        4. impact: is ==3
+# should be a tool, not a node maybe. Depends if agent should call or we want max deterministic flow
+def request_email_clarification(state) -> Command:
+    """Request clarification from user if email content is insufficient for classification or issue resolution."""
+    try:
+        # gmail_draft_service = GmailCreateDraft(api_resource=state.toolkit.api_resource)
+        gmail_send_service = GmailSendMessage(api_resource=state.toolkit.api_resource)
+
+        # body requesting user provide more info
+        to = [state['raw_email'].sender]
+        subject = "More information is needed to process your support request"
+        message = f"""
+        Hi {to},
+
+        IT Support has received your request. To further process your request, more information is required.
+
+        Please provide the following information:
+        {state['classification'].needs_info}
     """
-    print(f"In output_guardrail checking state: {state}")
+        # create draft
+        # body = gmail_draft_service.run({
+        #     "message": message,
+        #     "to": to,
+        #     "subject": subject
+        # })
+        # print(f"Additional info email drafted: {body}")
+        # draft_response = body['message'].raw
 
-def approval(state):
-    """human approval for non low priority tickets."""
+        # send email
+        send_email = gmail_send_service.run({
+            "message": message,
+            "to": to,
+            "subject": subject
+        })
 
-def create_ticket(state):
-    """Create a ServiceNow incident ticket based on the email content and classification."""
+        print(f"Additional info email sent to user: {send_email}")
+        
+        return Command(
+            update={state['messages']: AIMessage(content=f"{send_email}")},
+            goto=END
+        )
+
+    except Exception as e:
+        print(f"Error drafting or sending email: {e}")
+        return Command(
+            update={state['messages']: AIMessage(content=f"{send_email}")},
+            goto="human_review"
+        )
+
+def create_ticket(state) -> Command:
+    """Create a ServiceNow incident ticket based on the classification."""
+    try:
+        print(f"\nIn create_ticket...\n")
+        return Command(
+            update=state,
+            goto=""
+        )
+    except Exception as e:
+        return Command(
+            update=state['messages'].append(SystemMessage(content=f"Error creating ticket: {e}")),
+            goto="human_review"
+        )
+
+def search_kb(state):
+    """Search IT support knowledge base for relevant articles based on email content and classification. TBD: Probably do a similarity search based on email embedding and kb article embeddings?"""
+
 
 def send_slack_notification(state):
     """Send a notification to the IT support team in Slack with details of the new incident."""
 
-def handle_breaker(state):
-    """Each risky operation (llm call, tool use) gets a separate CB state. Handle all transitions based on operation outcome."""
+def human_review(state):
+    """Human review for issues creating ticket, classification, and any other failures"""
 
-def send_logs(state):
-    """Send logs and traces of infrastructure and LLM"""
+
+# def handle_breaker(state):
+#     """Each risky operation (llm call, tool use) gets a separate CB state. Handle all transitions based on operation outcome.
+    
+#     TODO: Need to look into the Fault Tolerance features in langgraph to see if this can be handled more elegantly with built in CB states or middlewares. Otherwise, may need to create custom CB states and handle transitions manually in this node.
+#     """
+
+# def send_logs(state):
+#     """Send logs and traces of infrastructure and LLM.
+    
+#     TODO: This node may not be needed. Look into middlewares (possibly custom) or Fault Tolerance features in langgraph. Log/Traces seem to be handled by tacking on some setting or middleware to the nodes.
+#     """
+
+
+# def validate_issue(state: AgentState):
+#     """Analyze the issue in the email and determine appropriate next steps for resolution.
+    
+#     TODO: validate_issue() part may also be better handled with middleware or something else. Why? LangGraph provides built in support for guardrails and validation, so it may be possible to use those features instead of manually validating the LLM output in a node. TBD after further investigation into LangGraph features. Just for example, see with_structured_output().
+
+#     """
+#     pprint('\n\nAnalyzing LLM output...')
+
+#     try:        
+#         if state.classification is not None:
+#             if EmailClassification.model_validate_json(json.dumps(state.classification.__dict__)):
+#                 print('\n\nLLM output validated against classification schema...continuing.')
+#                 return state
+#     except Exception as e:
+#         print(f'\n\nInterrupting as LLM response JSON could not be validated: {e}')
+#         interrupt(f"\n\nLLM response could not be validated: {json.dumps(state)}")
+#         # TODO: rerun prompt through LLM if output does not follow EmailClassification schema
