@@ -19,13 +19,15 @@ async def workflow():
     graph.add_node("request_email_clarification", request_email_clarification)
     graph.add_node("create_ticket", create_ticket)
     graph.add_node("send_slack_notification", send_slack_notification)
-    graph.add_node("human_review", human_review)
 
     # add edges
     graph.add_edge(START, "read_email")
     graph.add_edge("read_email", "classification")
-    graph.add_conditional_edges("classification", ['human_review', 'request_email_clarification', 'create_ticket'])
+    # happy path
     graph.add_edge("create_ticket", "send_slack_notification")
+    # needs more user info
+    graph.add_edge("request_email_clarification", "send_slack_notification")
+    # notify IT of ticket creation, approvals, and workflow errors
     graph.add_edge("send_slack_notification", END)
 
     # compile graph and return    
