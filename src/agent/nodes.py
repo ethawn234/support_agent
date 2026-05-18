@@ -27,17 +27,16 @@ def read_email(state: AgentState):
     except Exception as e:
         print(f"\n\nInvalid email type. 'Support' not found in subject: {e}")
         # have human determine if email
-        return "request_slack_or_email_clarification"
+        return "request_email_clarification"
 
-
-def classification(state: AgentState) -> Command[Literal["human_review", "request_slack_or_email_clarification", "create_ticket"]]:
+def classification(state: AgentState) -> Command[Literal["human_review", "request_email_clarification", "create_ticket"]]:
     """Classify incoming email and determine nature of the request, urgency, and category. This will help determine the appropriate next steps for resolution, such as whether human approval is needed, whether clarification is needed from the user, or whether a ticket can be automatically created and relevant teams notified.
 
     1. If classified:
         a. if low-priority, goto create_ticket
         b. if high-priority (or risky -> impact), goto human_review
     2. If more info required:
-        - goto request_slack_or_email_clarification
+        - goto request_email_clarification
     """
     print("\n\nIn classification()") 
     try:
@@ -69,9 +68,10 @@ def classification(state: AgentState) -> Command[Literal["human_review", "reques
         response = llm.with_structured_output(EmailClassification).invoke(prompt.content)
         impact = response["impact"]
         needs_info = response["needs_info"]
-        
+
+        goto: Literal["human_review", "request_email_clarification", "create_ticket"]
         if needs_info:
-            goto = "request_slack_or_email_clarification"
+            goto = "request_email_clarification"
         else:
             goto = "create_ticket"
 
