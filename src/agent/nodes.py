@@ -22,7 +22,10 @@ def read_email(state: AgentState):
 
             if "support" in request['subject'] or "Support" in request['subject']:
                 print(f"\n\nEmail is a valid IT Support request: {request}")
-
+            # is_valid_req might be better handled via semantic analysis eg classification node; still deciding; ultimately this initial node should do light structural preproccessing
+            state.is_valid_req = True
+        else:
+            state.is_valid_req = False
         return state
     except Exception as e:
         print(f"Error in read_email: {e}")
@@ -37,8 +40,8 @@ def classification(state: AgentState) -> Command[Literal["send_slack_notificatio
     2. If more info required:
         - goto request_email_clarification
     """
-    print("\n\nIn classification()") 
     try:
+        print(f"In classification, current state: {state}")
         prompt = SystemMessage(f"""Classify the following support request into one of the following categories: 1) password_issue, 2) hardware_issue, 3) software_issue 4) general_inquiry. 
         
         Request: {state.email_content}
@@ -55,7 +58,7 @@ def classification(state: AgentState) -> Command[Literal["send_slack_notificatio
                 "analysis": "Agent's analysis and recommendation",
                 "priority": "Severity of request (decreasing priority 1 - 5)",
                 "impact": "The effect of an issue on the business (decreasing impact from 1 - 3)",
-                "needs_info": "Boolean indicating if more information is required from the requestor"
+                "needs_info": "List of additional information user must provide to process request"
             }}
         ]
         ```
@@ -64,9 +67,10 @@ def classification(state: AgentState) -> Command[Literal["send_slack_notificatio
         # if high-priority, goto = human_review
         
         # if low-priority, goto = create_ticket
-        response = llm.with_structured_output(EmailClassification).invoke(prompt.content)
-        impact = response["impact"]
-        needs_info = response["needs_info"]
+        raw_response = llm.with_structured_output(EmailClassification).invoke(prompt.content)
+        response = EmailClassification.model_validate(raw_response)
+        impact = response.impact
+        needs_info = response.needs_info
 
         goto: Literal["send_slack_notification", "request_email_clarification", "create_ticket"]
         if needs_info:
@@ -93,7 +97,7 @@ def request_email_clarification(state) -> Command:
         gmail_send_service = GmailSendMessage(api_resource=state.toolkit.api_resource)
 
         # body requesting user provide more info
-        to = [state['raw_email'].sender]
+        to = [state.raw_email[0].get("sender")]
         subject = "More information is needed to process your support request"
         message = f"""
         Hi {to},
@@ -101,7 +105,7 @@ def request_email_clarification(state) -> Command:
         IT Support has received your request. To further process your request, more information is required.
 
         Please provide the following information:
-        {state['classification'].needs_info}
+        {state.classification.needs_info}
     """
         # create draft
         # body = gmail_draft_service.run({
@@ -122,7 +126,7 @@ def request_email_clarification(state) -> Command:
         print(f"Additional info email sent to user: {send_email}")
         
         return Command(
-            update={state['messages']: AIMessage(content=f"{send_email}")},
+            update={"messages": [AIMessage(content=f"{send_email}")]},
             goto=END
         )
 
@@ -143,8 +147,9 @@ def create_ticket(state) -> Command:
         return _handle_error(state, content="draft_ticket", error_msg=e, goto="send_slack_notification")
 
 def _handle_error(state, content, error_msg, goto) -> Command[Literal["send_slack_notification", "request_email_clarification", "create_ticket"]]:
+    print(f"In _handle_error: {state, content, error_msg, goto}")
     return Command(
-        update=state['messages'].append(SystemMessage(content=f"There was an error.\nContent={content}\nError: {error_msg}")),
+        update={"messages": [SystemMessage(content=f"There was an error.\nContent={content}\nError: {error_msg}")]},
         goto=goto
     )
 
