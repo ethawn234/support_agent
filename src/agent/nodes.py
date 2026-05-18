@@ -43,7 +43,7 @@ def classification(state: AgentState) -> Command[Literal["human_review", "reques
         prompt = SystemMessage(f"""Classify the following support request into one of the following categories: 1) password_issue, 2) hardware_issue, 3) software_issue 4) general_inquiry. 
         
         Request: {state.email_content}
-
+        
         Analyze this IT request and provide the classification, including intent, priority, category, and summary.
 
         Example output:
@@ -51,11 +51,11 @@ def classification(state: AgentState) -> Command[Literal["human_review", "reques
         [
             {{
                 "intent": "The intent of the email (e.g., password reset, software issue, hardware issue)",
-                "urgency": "The extent to which resolution of an incident can bear delay (1 for high delay, 3 for low delay)",
+                "urgency": "The extent to which resolution of an incident can bear delay (decreasing urgency 1 to 3)",
                 "category": "Category of the issue: ["network", "software", "hardware", "password_reset", "inquiry", "database"]",
                 "analysis": "Agent's analysis and recommendation",
-                "priority": "An integer from 1 to 5 indicating the severity in which an incident needs to be resolved: 1 - Critical, 2 - High, 3 - Moderate, 4 - Low, 5 - Planning",
-                "impact": "The effect of an issue on the business: 1 - High, 2 - Medium, 3 - Low",
+                "priority": "Severity of request (decreasing priority 1 - 5)",
+                "impact": "The effect of an issue on the business (decreasing impact from 1 - 3)",
                 "needs_info": "Boolean indicating if more information is required from the requestor"
             }}
         ]
