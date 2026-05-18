@@ -23,7 +23,7 @@ class EmailClassification(BaseModel):
     analysis: str = Field(..., description="Agent's analysis and recommendation")
     priority: Priority = Field(..., description="Severity of the issue")
     impact: Impact = Field(..., description="The effect of an issue on the business")
-    needs_info: Optional[str] = Field(None, description="List of additional information user must provide to process request")
+    needs_info: Optional[List[str]] = Field(None, description="List of additional information user must provide to process request")
 class ServiceNowIncident(BaseModel):
     short_description: str = Field(..., description="Short description of the incident")
     description: str = Field(..., description="Detailed description of the incident")
