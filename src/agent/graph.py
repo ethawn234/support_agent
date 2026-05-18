@@ -24,7 +24,7 @@ async def workflow():
     # add edges
     graph.add_edge(START, "read_email")
     graph.add_edge("read_email", "classification")
-    graph.add_conditional_edges("classification", ['human_review', 'request_slack_or_email_clarification', 'create_ticket'])
+    graph.add_conditional_edges("classification", ['human_review', 'request_email_clarification', 'create_ticket'])
     graph.add_edge("create_ticket", "send_slack_notification")
     graph.add_edge("send_slack_notification", END)
 
