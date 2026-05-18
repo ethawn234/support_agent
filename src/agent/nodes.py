@@ -25,11 +25,10 @@ def read_email(state: AgentState):
 
         return state
     except Exception as e:
-        print(f"\n\nInvalid email type. 'Support' not found in subject: {e}")
-        # have human determine if email
-        return "request_email_clarification"
+        print(f"Error in read_email: {e}")
+        return _handle_error(state, content=state.raw_email, error_msg=e, goto="send_slack_notification")
 
-def classification(state: AgentState) -> Command[Literal["human_review", "request_email_clarification", "create_ticket"]]:
+def classification(state: AgentState) -> Command[Literal["send_slack_notification", "request_email_clarification", "create_ticket"]]:
     """Classify incoming email and determine nature of the request, urgency, and category. This will help determine the appropriate next steps for resolution, such as whether human approval is needed, whether clarification is needed from the user, or whether a ticket can be automatically created and relevant teams notified.
 
     1. If classified:
@@ -69,7 +68,7 @@ def classification(state: AgentState) -> Command[Literal["human_review", "reques
         impact = response["impact"]
         needs_info = response["needs_info"]
 
-        goto: Literal["human_review", "request_email_clarification", "create_ticket"]
+        goto: Literal["send_slack_notification", "request_email_clarification", "create_ticket"]
         if needs_info:
             goto = "request_email_clarification"
         else:
@@ -82,11 +81,8 @@ def classification(state: AgentState) -> Command[Literal["human_review", "reques
     
     except Exception as e:
         # handle 429
-        print(f'Could not get LLM classifiction: {e}')
-        return Command(
-            update={ "classification": response },
-            goto="human_review"
-        )
+        print(f"Error in classification: {e}")
+        return _handle_error(state, content=response, error_msg=e, goto="send_slack_notification")
 
 
 # should be a tool, not a node maybe. Depends if agent should call or we want max deterministic flow
@@ -131,11 +127,8 @@ def request_email_clarification(state) -> Command:
         )
 
     except Exception as e:
-        print(f"Error drafting or sending email: {e}")
-        return Command(
-            update={state['messages']: AIMessage(content=f"{send_email}")},
-            goto="human_review"
-        )
+        print(f"Error in request_email_clarification: {e}")
+        return _handle_error(state, content=send_email, error_msg=e, goto="send_slack_notification")
 
 def create_ticket(state) -> Command:
     """Create a ServiceNow incident ticket based on the classification."""
@@ -146,10 +139,14 @@ def create_ticket(state) -> Command:
             goto=""
         )
     except Exception as e:
-        return Command(
-            update=state['messages'].append(SystemMessage(content=f"Error creating ticket: {e}")),
-            goto="human_review"
-        )
+        print(f"Error in create_ticket: {e}")
+        return _handle_error(state, content="draft_ticket", error_msg=e, goto="send_slack_notification")
+
+def _handle_error(state, content, error_msg, goto) -> Command[Literal["send_slack_notification", "request_email_clarification", "create_ticket"]]:
+    return Command(
+        update=state['messages'].append(SystemMessage(content=f"There was an error.\nContent={content}\nError: {error_msg}")),
+        goto=goto
+    )
 
 def search_kb(state):
     """Search IT support knowledge base for relevant articles based on email content and classification. TBD: Probably do a similarity search based on email embedding and kb article embeddings?"""
